@@ -27,6 +27,8 @@ export default class SignInToText extends React.PureComponent {
     };
 
     render() {
+	return <></>;
+
         let signInToText = _t('Sign in to your Matrix account on %(serverName)s', {
             serverName: this.props.serverConfig.hsName,
         });
