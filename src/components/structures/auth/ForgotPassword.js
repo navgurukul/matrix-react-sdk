@@ -282,10 +282,6 @@ export default createReactClass({
         return <div>
             {errorText}
             {serverDeadSection}
-            <h3>
-                {yourMatrixAccountText}
-                {editLink}
-            </h3>
             <form onSubmit={this.onSubmitForm}>
                 <div className="mx_AuthBody_fieldRow">
                     <Field
