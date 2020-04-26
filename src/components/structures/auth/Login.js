@@ -677,13 +677,7 @@ export default createReactClass({
                     {_t("If you've joined lots of rooms, this might take a while")}
                 </div> }
             </div>;
-        } else {
-            footer = (
-                <a className="mx_AuthBody_changeFlow" onClick={this.onTryRegisterClick} href="#">
-                    { _t('Create account') }
-                </a>
-            );
-        }
+        } 
 
         return (
             <AuthPage>
