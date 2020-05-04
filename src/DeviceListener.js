@@ -216,13 +216,13 @@ export default class DeviceListener {
                         });
                     } else {
                         // No cross-signing or key backup on account (set up encryption)
-                        ToastStore.sharedInstance().addOrReplaceToast({
-                            key: THIS_DEVICE_TOAST_KEY,
-                            title: _t("Set up encryption"),
-                            icon: "verification_warning",
-                            props: {kind: 'set_up_encryption'},
-                            component: sdk.getComponent("toasts.SetupEncryptionToast"),
-                        });
+                        // ToastStore.sharedInstance().addOrReplaceToast({
+                        //    key: THIS_DEVICE_TOAST_KEY,
+                        //    title: _t("Set up encryption"),
+                        //    icon: "verification_warning",
+                        //    props: {kind: 'set_up_encryption'},
+                        //    component: sdk.getComponent("toasts.SetupEncryptionToast"),
+                        // });
                     }
                 }
             } else if (await cli.secretStorageKeyNeedsUpgrade()) {
