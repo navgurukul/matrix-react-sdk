@@ -49,9 +49,7 @@
     "lint:js": "eslint --max-warnings 0 --ignore-path .eslintignore.errorfiles src test",
     "lint:ts": "tslint --project ./tsconfig.json -t stylish",
     "lint:types": "tsc --noEmit --jsx react",
-    "lint:style": "stylelint 'res/css/**/*.scss'",
-    "test": "jest",
-    "test:e2e": "./test/end-to-end-tests/run.sh --riot-url http://localhost:8080"
+    "lint:style": "stylelint 'res/css/**/*.scss'"
   },
   "dependencies": {
     "@babel/runtime": "^7.8.3",
@@ -153,7 +151,7 @@
     "webpack": "^4.20.2",
     "webpack-cli": "^3.1.1"
   },
-  "jest": {
+  "jest_random": {
     "testMatch": [
       "<rootDir>/test/**/*-test.js"
     ],
