@@ -49,6 +49,7 @@
     "lint:js": "eslint --max-warnings 0 --ignore-path .eslintignore.errorfiles src test",
     "lint:ts": "tslint --project ./tsconfig.json -t stylish",
     "lint:types": "tsc --noEmit --jsx react",
+    "tesst": "true",
     "lint:style": "stylelint 'res/css/**/*.scss'"
   },
   "dependencies": {
