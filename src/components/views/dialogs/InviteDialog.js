@@ -27,7 +27,7 @@ import {getHttpUriForMxc} from "matrix-js-sdk/src/content-repo";
 import * as Email from "../../../email";
 import {getDefaultIdentityServerUrl, useDefaultIdentityServer} from "../../../utils/IdentityServerUtils";
 import {abbreviateUrl} from "../../../utils/UrlUtils";
-import dis from "../../../dispatcher";
+import dis from "../../../dispatcher/dispatcher";
 import IdentityAuthClient from "../../../IdentityAuthClient";
 import Modal from "../../../Modal";
 import {humanizeTime} from "../../../utils/humanize";
@@ -36,6 +36,7 @@ import {inviteMultipleToRoom} from "../../../RoomInvite";
 import SettingsStore from '../../../settings/SettingsStore';
 import RoomListStore, {TAG_DM} from "../../../stores/RoomListStore";
 import {Key} from "../../../Keyboard";
+import {Action} from "../../../dispatcher/actions";
 
 export const KIND_DM = "dm";
 export const KIND_INVITE = "invite";
@@ -902,7 +903,7 @@ export default class InviteDialog extends React.PureComponent {
 
     _onManageSettingsClick = (e) => {
         e.preventDefault();
-        dis.dispatch({ action: 'view_user_settings' });
+        dis.fire(Action.ViewUserSettings);
         this.props.onFinished();
     };
 
@@ -1070,9 +1071,8 @@ export default class InviteDialog extends React.PureComponent {
         let buttonText;
         let goButtonFn;
 
+        const userId = MatrixClientPeg.get().getUserId();
         if (this.props.kind === KIND_DM) {
-            const userId = MatrixClientPeg.get().getUserId();
-
             title = _t("Direct Messages");
             helpText = _t(
                 "Start a conversation with someone using their name, username (like <userId/>) or email address.",
@@ -1086,9 +1086,11 @@ export default class InviteDialog extends React.PureComponent {
         } else { // KIND_INVITE
             title = _t("Invite to this room");
             helpText = _t(
-                "If you can't find someone, ask them for their username (e.g. @user:server.com) or " +
-                "<a>share this room</a>.", {},
+                "Invite someone using their name, username (like <userId/>), email address or <a>share this room</a>.",
+                {},
                 {
+                    userId: () =>
+                        <a href={makeUserPermalink(userId)} rel="noreferrer noopener" target="_blank">{userId}</a>,
                     a: (sub) =>
                         <a href={makeRoomPermalink(this.props.roomId)} rel="noreferrer noopener" target="_blank">{sub}</a>,
                 },
