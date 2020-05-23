@@ -22,6 +22,8 @@ import { DispatcherAction } from "./actions";
 export interface ActionPayload {
     [property: string]: any; // effectively makes this 'extends Object'
     action: DispatcherAction;
+    register: any;
+    unregister: any;
 }
 
 /**
