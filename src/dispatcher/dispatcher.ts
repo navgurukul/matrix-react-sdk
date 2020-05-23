@@ -62,6 +62,9 @@ export class MatrixDispatcher extends Dispatcher<ActionPayload> {
     fire(action: Action, sync = false) {
         this.dispatch({action}, sync);
     }
+
+    register(callback: (payload: <any>) => void): <any>;
+    unregister(id: <any>): void;
 }
 
 export const defaultDispatcher = new MatrixDispatcher();
