@@ -49,7 +49,7 @@
     "lint:js": "eslint --max-warnings 0 --ignore-path .eslintignore.errorfiles src test",
     "lint:ts": "tslint --project ./tsconfig.json -t stylish",
     "lint:types": "tsc --noEmit --jsx react",
-    "tesst": "true",
+    "test": "true",
     "lint:style": "stylelint 'res/css/**/*.scss'",
     "update": "git pull main develop && git push"
   },
@@ -157,7 +157,7 @@
     "webpack": "^4.20.2",
     "webpack-cli": "^3.1.1"
   },
-  "jest_random": {
+  "jest": {
     "testMatch": [
       "<rootDir>/test/**/*-test.js"
     ],
