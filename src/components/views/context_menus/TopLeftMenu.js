@@ -145,7 +145,7 @@ export default class TopLeftMenu extends React.Component {
     }
 
     signOut() {
-        Modal.createTrackedDialog('Logout E2E Export', '', LogoutDialog);
+        //Modal.createTrackedDialog('Logout E2E Export', '', LogoutDialog);
         this.closeMenu();
     }
 

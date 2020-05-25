@@ -8,8 +8,8 @@ package-lock.json
 # version file and tarball created by `npm pack` / `yarn pack`
 /git-revision.txt
 /matrix-react-sdk-*.tgz
+/src/component-index.js 
 
 /.idea
-/src/component-index.js
 
 .DS_Store
