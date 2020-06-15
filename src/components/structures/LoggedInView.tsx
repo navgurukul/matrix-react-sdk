@@ -452,9 +452,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
                 // composer, so CTRL+` it is
 
                 if (ctrlCmdOnly) {
-                    dis.dispatch({
-                        action: 'toggle_top_left_menu',
-                    });
+                    dis.fire(Action.ToggleUserMenu);
                     handled = true;
                 }
                 break;
@@ -679,7 +677,7 @@ class LoggedInView extends React.PureComponent<IProps, IState> {
         if (SettingsStore.isFeatureEnabled("feature_new_room_list")) {
             // TODO: Supply props like collapsed and disabled to LeftPanel2
             leftPanel = (
-                <LeftPanel2 />
+                <LeftPanel2 isMinimized={this.props.collapseLhs || false} />
             );
         }
 
