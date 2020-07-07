@@ -30,6 +30,12 @@ import { BreadcrumbsStore } from "../../stores/BreadcrumbsStore";
 import { UPDATE_EVENT } from "../../stores/AsyncStore";
 import ResizeNotifier from "../../utils/ResizeNotifier";
 import SettingsStore from "../../settings/SettingsStore";
+import RoomListStore, { LISTS_UPDATE_EVENT } from "../../stores/room-list/RoomListStore2";
+import {Key} from "../../Keyboard";
+import IndicatorScrollbar from "../structures/IndicatorScrollbar";
+
+// TODO: Remove banner on launch: https://github.com/vector-im/riot-web/issues/14231
+// TODO: Rename on launch: https://github.com/vector-im/riot-web/issues/14231
 
 /*******************************************************************
  *   CAUTION                                                       *
@@ -45,21 +51,25 @@ interface IProps {
 }
 
 interface IState {
-    searchFilter: string; // TODO: Move search into room list?
+    searchFilter: string;
     showBreadcrumbs: boolean;
     showTagPanel: boolean;
 }
 
+// List of CSS classes which should be included in keyboard navigation within the room list
+const cssClasses = [
+    "mx_RoomSearch_input",
+    "mx_RoomSearch_icon", // minimized <RoomSearch />
+    "mx_RoomSublist2_headerText",
+    "mx_RoomTile2",
+    "mx_RoomSublist2_showNButton",
+];
+
 export default class LeftPanel2 extends React.Component<IProps, IState> {
     private listContainerRef: React.RefObject<HTMLDivElement> = createRef();
     private tagPanelWatcherRef: string;
-
-    // TODO: Properly support TagPanel
-    // TODO: Properly support searching/filtering
-    // TODO: Properly support breadcrumbs
-    // TODO: a11y
-    // TODO: actually make this useful in general (match design proposals)
-    // TODO: Fadable support (is this still needed?)
+    private focusedElement = null;
+    private isDoingStickyHeaders = false;
 
     constructor(props: IProps) {
         super(props);
@@ -71,6 +81,7 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
         };
 
         BreadcrumbsStore.instance.on(UPDATE_EVENT, this.onBreadcrumbsUpdate);
+        RoomListStore.instance.on(LISTS_UPDATE_EVENT, this.onBreadcrumbsUpdate);
         this.tagPanelWatcherRef = SettingsStore.watchSetting("TagPanel.enableTagPanel", null, () => {
             this.setState({showTagPanel: SettingsStore.getValue("TagPanel.enableTagPanel")});
         });
@@ -83,6 +94,7 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
     public componentWillUnmount() {
         SettingsStore.unwatchSetting(this.tagPanelWatcherRef);
         BreadcrumbsStore.instance.off(UPDATE_EVENT, this.onBreadcrumbsUpdate);
+        RoomListStore.instance.off(LISTS_UPDATE_EVENT, this.onBreadcrumbsUpdate);
         this.props.resizeNotifier.off("middlePanelResizedNoisy", this.onResize);
     }
 
@@ -102,6 +114,23 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
     };
 
     private handleStickyHeaders(list: HTMLDivElement) {
+        // TODO: Evaluate if this has any performance benefit or detriment.
+        // See https://github.com/vector-im/riot-web/issues/14035
+
+        if (this.isDoingStickyHeaders) return;
+        this.isDoingStickyHeaders = true;
+        if (window.requestAnimationFrame) {
+            window.requestAnimationFrame(() => {
+                this.doStickyHeaders(list);
+                this.isDoingStickyHeaders = false;
+            });
+        } else {
+            this.doStickyHeaders(list);
+            this.isDoingStickyHeaders = false;
+        }
+    }
+
+    private doStickyHeaders(list: HTMLDivElement) {
         const rlRect = list.getBoundingClientRect();
         const bottom = rlRect.bottom;
         const top = rlRect.top;
@@ -112,6 +141,7 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
         const headerStickyWidth = rlRect.width - headerRightMargin;
 
         let gotBottom = false;
+        let lastTopHeader;
         for (const sublist of sublists) {
             const slRect = sublist.getBoundingClientRect();
 
@@ -121,24 +151,30 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
                 header.classList.add("mx_RoomSublist2_headerContainer_sticky");
                 header.classList.add("mx_RoomSublist2_headerContainer_stickyBottom");
                 header.style.width = `${headerStickyWidth}px`;
-                header.style.top = `unset`;
+                header.style.removeProperty("top");
                 gotBottom = true;
-            } else if (slRect.top < top) {
+            } else if ((slRect.top - (headerHeight / 3)) < top) {
                 header.classList.add("mx_RoomSublist2_headerContainer_sticky");
                 header.classList.add("mx_RoomSublist2_headerContainer_stickyTop");
                 header.style.width = `${headerStickyWidth}px`;
                 header.style.top = `${rlRect.top}px`;
+                if (lastTopHeader) {
+                    lastTopHeader.style.display = "none";
+                }
+                // first unset it, if set in last iteration
+                header.style.removeProperty("display");
+                lastTopHeader = header;
             } else {
                 header.classList.remove("mx_RoomSublist2_headerContainer_sticky");
                 header.classList.remove("mx_RoomSublist2_headerContainer_stickyTop");
                 header.classList.remove("mx_RoomSublist2_headerContainer_stickyBottom");
-                header.style.width = `unset`;
-                header.style.top = `unset`;
+                header.style.removeProperty("width");
+                header.style.removeProperty("top");
             }
         }
     }
 
-    // TODO: Apply this on resize, init, etc for reliability
+    // TODO: Improve header reliability: https://github.com/vector-im/riot-web/issues/14232
     private onScroll = (ev: React.MouseEvent<HTMLDivElement>) => {
         const list = ev.target as HTMLDivElement;
         this.handleStickyHeaders(list);
@@ -149,18 +185,76 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
         this.handleStickyHeaders(this.listContainerRef.current);
     };
 
-    private renderHeader(): React.ReactNode {
-        // TODO: Update when profile info changes
-        // TODO: Presence
-        // TODO: Breadcrumbs toggle
-        // TODO: Menu button
+    private onFocus = (ev: React.FocusEvent) => {
+        this.focusedElement = ev.target;
+    };
 
+    private onBlur = () => {
+        this.focusedElement = null;
+    };
+
+    private onKeyDown = (ev: React.KeyboardEvent) => {
+        if (!this.focusedElement) return;
+
+        switch (ev.key) {
+            case Key.ARROW_UP:
+            case Key.ARROW_DOWN:
+                ev.stopPropagation();
+                ev.preventDefault();
+                this.onMoveFocus(ev.key === Key.ARROW_UP);
+                break;
+        }
+    };
+
+    private onMoveFocus = (up: boolean) => {
+        let element = this.focusedElement;
+
+        let descending = false; // are we currently descending or ascending through the DOM tree?
+        let classes: DOMTokenList;
+
+        do {
+            const child = up ? element.lastElementChild : element.firstElementChild;
+            const sibling = up ? element.previousElementSibling : element.nextElementSibling;
+
+            if (descending) {
+                if (child) {
+                    element = child;
+                } else if (sibling) {
+                    element = sibling;
+                } else {
+                    descending = false;
+                    element = element.parentElement;
+                }
+            } else {
+                if (sibling) {
+                    element = sibling;
+                    descending = true;
+                } else {
+                    element = element.parentElement;
+                }
+            }
+
+            if (element) {
+                classes = element.classList;
+            }
+        } while (element && !cssClasses.some(c => classes.contains(c)));
+
+        if (element) {
+            element.focus();
+            this.focusedElement = element;
+        }
+    };
+
+    private renderHeader(): React.ReactNode {
         let breadcrumbs;
-        if (this.state.showBreadcrumbs) {
+        if (this.state.showBreadcrumbs && !this.props.isMinimized) {
             breadcrumbs = (
-                <div className="mx_LeftPanel2_headerRow mx_LeftPanel2_breadcrumbsContainer">
-                    {this.props.isMinimized ? null : <RoomBreadcrumbs2 />}
-                </div>
+                <IndicatorScrollbar
+                    className="mx_LeftPanel2_headerRow mx_LeftPanel2_breadcrumbsContainer mx_AutoHideScrollbar"
+                    verticalScrollsHorizontally={true}
+                >
+                    <RoomBreadcrumbs2 />
+                </IndicatorScrollbar>
             );
         }
 
@@ -173,16 +267,22 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
     }
 
     private renderSearchExplore(): React.ReactNode {
-        // TODO: Collapsed support
-
         return (
-            <div className="mx_LeftPanel2_filterContainer">
-                <RoomSearch onQueryUpdate={this.onSearch} isMinimized={this.props.isMinimized} />
+            <div
+                className="mx_LeftPanel2_filterContainer"
+                onFocus={this.onFocus}
+                onBlur={this.onBlur}
+                onKeyDown={this.onKeyDown}
+            >
+                <RoomSearch
+                    onQueryUpdate={this.onSearch}
+                    isMinimized={this.props.isMinimized}
+                    onVerticalArrow={this.onKeyDown}
+                />
                 <AccessibleButton
-                    tabIndex={-1}
-                    className='mx_LeftPanel2_exploreButton'
+                    className="mx_LeftPanel2_exploreButton"
                     onClick={this.onExplore}
-                    alt={_t("Explore rooms")}
+                    title={_t("Explore rooms")}
                 />
             </div>
         );
@@ -195,24 +295,29 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
             </div>
         );
 
-        // TODO: Improve props for RoomList2
         const roomList = <RoomList2
-            onKeyDown={() => {/*TODO*/}}
+            onKeyDown={this.onKeyDown}
             resizeNotifier={null}
             collapsed={false}
             searchFilter={this.state.searchFilter}
-            onFocus={() => {/*TODO*/}}
-            onBlur={() => {/*TODO*/}}
+            onFocus={this.onFocus}
+            onBlur={this.onBlur}
             isMinimized={this.props.isMinimized}
+            onResize={this.onResize}
         />;
 
-        // TODO: Conference handling / calls
+        // TODO: Conference handling / calls: https://github.com/vector-im/riot-web/issues/14177
 
         const containerClasses = classNames({
             "mx_LeftPanel2": true,
             "mx_LeftPanel2_hasTagPanel": !!tagPanel,
             "mx_LeftPanel2_minimized": this.props.isMinimized,
         });
+
+        const roomListClasses = classNames(
+            "mx_LeftPanel2_actualRoomListContainer",
+            "mx_AutoHideScrollbar",
+        );
 
         return (
             <div className={containerClasses}>
@@ -221,10 +326,15 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
                     {this.renderHeader()}
                     {this.renderSearchExplore()}
                     <div
-                        className="mx_LeftPanel2_actualRoomListContainer"
+                        className={roomListClasses}
                         onScroll={this.onScroll}
                         ref={this.listContainerRef}
-                    >{roomList}</div>
+                        // Firefox sometimes makes this element focusable due to
+                        // overflow:scroll;, so force it out of tab order.
+                        tabIndex={-1}
+                    >
+                        {roomList}
+                    </div>
                 </aside>
             </div>
         );
