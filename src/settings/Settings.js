@@ -159,12 +159,6 @@ export const SETTINGS = {
         supportedLevels: LEVELS_FEATURE,
         default: false,
     },
-    "feature_irc_ui": {
-        supportedLevels: LEVELS_ACCOUNT_SETTINGS,
-        displayName: _td('Enable IRC layout option in the appearance tab'),
-        default: false,
-        isFeature: true,
-    },
     "mjolnirRooms": {
         supportedLevels: ['account'],
         default: [],
@@ -478,13 +472,13 @@ export const SETTINGS = {
             deny: [],
         },
     },
-    // TODO: Remove setting: https://github.com/vector-im/riot-web/issues/14231
+    // TODO: Remove setting: https://github.com/vector-im/riot-web/issues/14373
     "RoomList.orderAlphabetically": {
         supportedLevels: LEVELS_ACCOUNT_SETTINGS,
         displayName: _td("Order rooms by name"),
         default: false,
     },
-    // TODO: Remove setting: https://github.com/vector-im/riot-web/issues/14231
+    // TODO: Remove setting: https://github.com/vector-im/riot-web/issues/14373
     "RoomList.orderByImportance": {
         supportedLevels: LEVELS_ACCOUNT_SETTINGS,
         displayName: _td("Show rooms with unread notifications first"),
@@ -574,7 +568,7 @@ export const SETTINGS = {
     },
     "useIRCLayout": {
         supportedLevels: LEVELS_ACCOUNT_SETTINGS,
-        displayName: _td("Use IRC layout"),
+        displayName: _td("Enable experimental, compact IRC style layout"),
         default: false,
     },
 };
