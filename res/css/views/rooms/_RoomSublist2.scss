@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO: Rename on launch: https://github.com/vector-im/riot-web/issues/14231
+// TODO: Rename on launch: https://github.com/vector-im/riot-web/issues/14367
 
 .mx_RoomSublist2 {
     // The sublist is a column of rows, essentially
@@ -196,6 +196,8 @@ limitations under the License.
             // as the box model should be top aligned. Happens in both FF and Chromium
             display: flex;
             flex-direction: column;
+
+            mask-image: linear-gradient(0deg, transparent, black 3px);
         }
 
         .mx_RoomSublist2_resizerHandles_showNButton {

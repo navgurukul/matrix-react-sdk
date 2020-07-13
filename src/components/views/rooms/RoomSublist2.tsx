@@ -17,10 +17,10 @@ limitations under the License.
 */
 
 import * as React from "react";
-import { createRef } from "react";
+import {createRef, UIEventHandler} from "react";
 import { Room } from "matrix-js-sdk/src/models/room";
 import classNames from 'classnames';
-import {RovingAccessibleButton, RovingTabIndexWrapper} from "../../../accessibility/RovingTabIndex";
+import { RovingAccessibleButton, RovingTabIndexWrapper } from "../../../accessibility/RovingTabIndex";
 import { _t } from "../../../languageHandler";
 import AccessibleButton from "../../views/elements/AccessibleButton";
 import RoomTile2 from "./RoomTile2";
@@ -36,20 +36,20 @@ import RoomListStore from "../../../stores/room-list/RoomListStore2";
 import { ListAlgorithm, SortAlgorithm } from "../../../stores/room-list/algorithms/models";
 import { DefaultTagID, TagID } from "../../../stores/room-list/models";
 import dis from "../../../dispatcher/dispatcher";
+import defaultDispatcher from "../../../dispatcher/dispatcher";
 import NotificationBadge from "./NotificationBadge";
 import { ListNotificationState } from "../../../stores/notifications/ListNotificationState";
 import AccessibleTooltipButton from "../elements/AccessibleTooltipButton";
 import { Key } from "../../../Keyboard";
-import defaultDispatcher from "../../../dispatcher/dispatcher";
-import {ActionPayload} from "../../../dispatcher/payloads";
+import { ActionPayload } from "../../../dispatcher/payloads";
 import { Enable, Resizable } from "re-resizable";
 import { Direction } from "re-resizable/lib/resizer";
 import { polyfillTouchEvent } from "../../../@types/polyfill";
 import { RoomNotificationStateStore } from "../../../stores/notifications/RoomNotificationStateStore";
 import RoomListLayoutStore from "../../../stores/room-list/RoomListLayoutStore";
 
-// TODO: Remove banner on launch: https://github.com/vector-im/riot-web/issues/14231
-// TODO: Rename on launch: https://github.com/vector-im/riot-web/issues/14231
+// TODO: Remove banner on launch: https://github.com/vector-im/riot-web/issues/14367
+// TODO: Rename on launch: https://github.com/vector-im/riot-web/issues/14367
 
 /*******************************************************************
  *   CAUTION                                                       *
@@ -130,17 +130,17 @@ export default class RoomSublist2 extends React.Component<IProps, IState> {
     private calculateInitialHeight() {
         const requestedVisibleTiles = Math.max(Math.floor(this.layout.visibleTiles), this.layout.minVisibleTiles);
         const tileCount = Math.min(this.numTiles, requestedVisibleTiles);
-        const height = this.layout.tilesToPixelsWithPadding(tileCount, this.padding);
-        return height;
+        return this.layout.tilesToPixelsWithPadding(tileCount, this.padding);
     }
 
     private get padding() {
         let padding = RESIZE_HANDLE_HEIGHT;
         // this is used for calculating the max height of the whole container,
         // and takes into account whether there should be room reserved for the show less button
-        // when fully expanded. Note that the show more button might still be shown when not fully expanded,
-        // but in this case it will take the space of a tile and we don't need to reserve space for it.
-        if (this.numTiles > this.layout.defaultVisibleTiles) {
+        // when fully expanded. We cannot check against the layout's defaultVisible tile count
+        // because there are conditions in which we need to know that the 'show more' button
+        // is present while well under the default tile limit.
+        if (this.numTiles > this.numVisibleTiles) {
             padding += SHOW_N_BUTTON_HEIGHT;
         }
         return padding;
@@ -322,25 +322,29 @@ export default class RoomSublist2 extends React.Component<IProps, IState> {
         }
     };
 
-    private onHeaderClick = (ev: React.MouseEvent<HTMLDivElement>) => {
-        let target = ev.target as HTMLDivElement;
-        if (!target.classList.contains('mx_RoomSublist2_headerText')) {
-            // If we don't have the headerText class, the user clicked the span in the headerText.
-            target = target.parentElement as HTMLDivElement;
-        }
-
-        const possibleSticky = target.parentElement;
+    private onHeaderClick = () => {
+        const possibleSticky = this.headerButton.current.parentElement;
         const sublist = possibleSticky.parentElement.parentElement;
         const list = sublist.parentElement.parentElement;
-        // the scrollTop is capped at the height of the header in LeftPanel2
+        // the scrollTop is capped at the height of the header in LeftPanel2, the top header is always sticky
         const isAtTop = list.scrollTop <= HEADER_HEIGHT;
-        const isSticky = possibleSticky.classList.contains('mx_RoomSublist2_headerContainer_sticky');
-        if (isSticky && !isAtTop) {
+        const isAtBottom = list.scrollTop >= list.scrollHeight - list.offsetHeight;
+        const isStickyTop = possibleSticky.classList.contains('mx_RoomSublist2_headerContainer_stickyTop');
+        const isStickyBottom = possibleSticky.classList.contains('mx_RoomSublist2_headerContainer_stickyBottom');
+
+        if ((isStickyBottom && !isAtBottom) || (isStickyTop && !isAtTop)) {
             // is sticky - jump to list
             sublist.scrollIntoView({behavior: 'smooth'});
         } else {
             // on screen - toggle collapse
+            const isExpanded = this.state.isExpanded;
             this.toggleCollapsed();
+            // if the bottom list is collapsed then scroll it in so it doesn't expand off screen
+            if (!isExpanded && isStickyBottom) {
+                setImmediate(() => {
+                    sublist.scrollIntoView({behavior: 'smooth'});
+                });
+            }
         }
     };
 
@@ -596,6 +600,12 @@ export default class RoomSublist2 extends React.Component<IProps, IState> {
         );
     }
 
+    private onScrollPrevent(e: React.UIEvent<HTMLDivElement>) {
+        // the RoomTile calls scrollIntoView and the browser may scroll a div we do not wish to be scrollable
+        // this fixes https://github.com/vector-im/riot-web/issues/14413
+        (e.target as HTMLDivElement).scrollTop = 0;
+    }
+
     public render(): React.ReactElement {
         // TODO: Error boundary: https://github.com/vector-im/riot-web/issues/14185
 
@@ -705,7 +715,7 @@ export default class RoomSublist2 extends React.Component<IProps, IState> {
                         className="mx_RoomSublist2_resizeBox"
                         enable={handles}
                     >
-                        <div className="mx_RoomSublist2_tiles">
+                        <div className="mx_RoomSublist2_tiles" onScroll={this.onScrollPrevent}>
                             {visibleTiles}
                         </div>
                         {showNButton}

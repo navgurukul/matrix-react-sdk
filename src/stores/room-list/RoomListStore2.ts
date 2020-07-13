@@ -30,10 +30,10 @@ import { TagWatcher } from "./TagWatcher";
 import RoomViewStore from "../RoomViewStore";
 import { Algorithm, LIST_UPDATED_EVENT } from "./algorithms/Algorithm";
 import { EffectiveMembership, getEffectiveMembership } from "./membership";
-import { ListLayout } from "./ListLayout";
 import { isNullOrUndefined } from "matrix-js-sdk/src/utils";
 import RoomListLayoutStore from "./RoomListLayoutStore";
 import { MarkedExecution } from "../../utils/MarkedExecution";
+import { AsyncStoreWithClient } from "../AsyncStoreWithClient";
 
 interface IState {
     tagsEnabled?: boolean;
@@ -45,8 +45,13 @@ interface IState {
  */
 export const LISTS_UPDATE_EVENT = "lists_update";
 
-export class RoomListStore2 extends AsyncStore<ActionPayload> {
-    private _matrixClient: MatrixClient;
+export class RoomListStore2 extends AsyncStoreWithClient<ActionPayload> {
+    /**
+     * Set to true if you're running tests on the store. Should not be touched in
+     * any other environment.
+     */
+    public static TEST_MODE = false;
+
     private initialListsGenerated = false;
     private enabled = false;
     private algorithm = new Algorithm();
@@ -74,12 +79,51 @@ export class RoomListStore2 extends AsyncStore<ActionPayload> {
     }
 
     public get matrixClient(): MatrixClient {
-        return this._matrixClient;
+        return super.matrixClient;
     }
 
-    // TODO: Remove enabled flag with the old RoomListStore: https://github.com/vector-im/riot-web/issues/14231
+    // Intended for test usage
+    public async resetStore() {
+        await this.reset();
+        this.tagWatcher = new TagWatcher(this);
+        this.filterConditions = [];
+        this.initialListsGenerated = false;
+
+        this.algorithm.off(LIST_UPDATED_EVENT, this.onAlgorithmListUpdated);
+        this.algorithm.off(FILTER_CHANGED, this.onAlgorithmListUpdated);
+        this.algorithm = new Algorithm();
+        this.algorithm.on(LIST_UPDATED_EVENT, this.onAlgorithmListUpdated);
+        this.algorithm.on(FILTER_CHANGED, this.onAlgorithmListUpdated);
+
+        // Reset state without causing updates as the client will have been destroyed
+        // and downstream code will throw NPE errors.
+        await this.reset(null, true);
+    }
+
+    // Public for test usage. Do not call this.
+    public async makeReady(forcedClient?: MatrixClient) {
+        if (forcedClient) {
+            super.matrixClient = forcedClient;
+        }
+
+        // TODO: Remove with https://github.com/vector-im/riot-web/issues/14367
+        this.checkEnabled();
+        if (!this.enabled) return;
+
+        // Update any settings here, as some may have happened before we were logically ready.
+        // Update any settings here, as some may have happened before we were logically ready.
+        console.log("Regenerating room lists: Startup");
+        await this.readAndCacheSettingsFromStore();
+        await this.regenerateAllLists({trigger: false});
+        await this.handleRVSUpdate({trigger: false}); // fake an RVS update to adjust sticky room, if needed
+
+        this.updateFn.mark(); // we almost certainly want to trigger an update.
+        this.updateFn.trigger();
+    }
+
+    // TODO: Remove enabled flag with the old RoomListStore: https://github.com/vector-im/riot-web/issues/14367
     private checkEnabled() {
-        this.enabled = SettingsStore.isFeatureEnabled("feature_new_room_list");
+        this.enabled = SettingsStore.getValue("feature_new_room_list");
         if (this.enabled) {
             console.log("⚡ new room list store engaged");
         }
@@ -99,7 +143,7 @@ export class RoomListStore2 extends AsyncStore<ActionPayload> {
      * be used if the calling code will manually trigger the update.
      */
     private async handleRVSUpdate({trigger = true}) {
-        if (!this.enabled) return; // TODO: Remove with https://github.com/vector-im/riot-web/issues/14231
+        if (!this.enabled) return; // TODO: Remove with https://github.com/vector-im/riot-web/issues/14367
         if (!this.matrixClient) return; // We assume there won't be RVS updates without a client
 
         const activeRoomId = RoomViewStore.getRoomId();
@@ -122,48 +166,32 @@ export class RoomListStore2 extends AsyncStore<ActionPayload> {
         if (trigger) this.updateFn.trigger();
     }
 
-    protected onDispatch(payload: ActionPayload) {
+    protected async onReady(): Promise<any> {
+        await this.makeReady();
+    }
+
+    protected async onNotReady(): Promise<any> {
+        await this.resetStore();
+    }
+
+    protected async onAction(payload: ActionPayload) {
+        // When we're running tests we can't reliably use setImmediate out of timing concerns.
+        // As such, we use a more synchronous model.
+        if (RoomListStore2.TEST_MODE) {
+            await this.onDispatchAsync(payload);
+            return;
+        }
+
         // We do this to intentionally break out of the current event loop task, allowing
         // us to instead wait for a more convenient time to run our updates.
         setImmediate(() => this.onDispatchAsync(payload));
     }
 
     protected async onDispatchAsync(payload: ActionPayload) {
-        if (payload.action === 'MatrixActions.sync') {
-            // Filter out anything that isn't the first PREPARED sync.
-            if (!(payload.prevState === 'PREPARED' && payload.state !== 'PREPARED')) {
-                return;
-            }
-
-            // TODO: Remove with https://github.com/vector-im/riot-web/issues/14231
-            this.checkEnabled();
-            if (!this.enabled) return;
-
-            this._matrixClient = payload.matrixClient;
-
-            // Update any settings here, as some may have happened before we were logically ready.
-            console.log("Regenerating room lists: Startup");
-            await this.readAndCacheSettingsFromStore();
-            await this.regenerateAllLists({trigger: false});
-            await this.handleRVSUpdate({trigger: false}); // fake an RVS update to adjust sticky room, if needed
-
-            this.updateFn.trigger();
-
-            return; // no point in running the next conditions - they won't match
-        }
-
         // TODO: Remove this once the RoomListStore becomes default
         if (!this.enabled) return;
 
-        if (payload.action === 'on_client_not_viable' || payload.action === 'on_logged_out') {
-            // Reset state without causing updates as the client will have been destroyed
-            // and downstream code will throw NPE errors.
-            await this.reset(null, true);
-            this._matrixClient = null;
-            this.initialListsGenerated = false; // we'll want to regenerate them
-        }
-
-        // Everything below here requires a MatrixClient or some sort of logical readiness.
+        // Everything here requires a MatrixClient or some sort of logical readiness.
         const logicallyReady = this.matrixClient && this.initialListsGenerated;
         if (!logicallyReady) return;
 
@@ -368,10 +396,14 @@ export class RoomListStore2 extends AsyncStore<ActionPayload> {
     }
 
     public async setTagSorting(tagId: TagID, sort: SortAlgorithm) {
+        await this.setAndPersistTagSorting(tagId, sort);
+        this.updateFn.trigger();
+    }
+
+    private async setAndPersistTagSorting(tagId: TagID, sort: SortAlgorithm) {
         await this.algorithm.setTagSorting(tagId, sort);
         // TODO: Per-account? https://github.com/vector-im/riot-web/issues/14114
         localStorage.setItem(`mx_tagSort_${tagId}`, sort);
-        this.updateFn.triggerIfWillMark();
     }
 
     public getTagSorting(tagId: TagID): SortAlgorithm {
@@ -386,7 +418,8 @@ export class RoomListStore2 extends AsyncStore<ActionPayload> {
 
     // logic must match calculateListOrder
     private calculateTagSorting(tagId: TagID): SortAlgorithm {
-        const defaultSort = SortAlgorithm.Alphabetic;
+        const isDefaultRecent = tagId === DefaultTagID.Invite || tagId === DefaultTagID.DM;
+        const defaultSort = isDefaultRecent ? SortAlgorithm.Recent : SortAlgorithm.Alphabetic;
         const settingAlphabetical = SettingsStore.getValue("RoomList.orderAlphabetically", null, true);
         const definedSort = this.getTagSorting(tagId);
         const storedSort = this.getStoredTagSorting(tagId);
@@ -407,10 +440,14 @@ export class RoomListStore2 extends AsyncStore<ActionPayload> {
     }
 
     public async setListOrder(tagId: TagID, order: ListAlgorithm) {
+        await this.setAndPersistListOrder(tagId, order);
+        this.updateFn.trigger();
+    }
+
+    private async setAndPersistListOrder(tagId: TagID, order: ListAlgorithm) {
         await this.algorithm.setListOrdering(tagId, order);
         // TODO: Per-account? https://github.com/vector-im/riot-web/issues/14114
         localStorage.setItem(`mx_listOrder_${tagId}`, order);
-        this.updateFn.triggerIfWillMark();
     }
 
     public getListOrder(tagId: TagID): ListAlgorithm {
@@ -458,10 +495,10 @@ export class RoomListStore2 extends AsyncStore<ActionPayload> {
             const listOrder = this.calculateListOrder(tag);
 
             if (tagSort !== definedSort) {
-                await this.setTagSorting(tag, tagSort);
+                await this.setAndPersistTagSorting(tag, tagSort);
             }
             if (listOrder !== definedOrder) {
-                await this.setListOrder(tag, listOrder);
+                await this.setAndPersistListOrder(tag, listOrder);
             }
         }
     }
@@ -481,16 +518,20 @@ export class RoomListStore2 extends AsyncStore<ActionPayload> {
     };
 
     private onAlgorithmFilterUpdated = () => {
-        // The filter can happen off-cycle, so trigger an update if we need to.
-        this.updateFn.triggerIfWillMark();
+        // The filter can happen off-cycle, so trigger an update. The filter will have
+        // already caused a mark.
+        this.updateFn.trigger();
     };
 
     /**
      * Regenerates the room whole room list, discarding any previous results.
+     *
+     * Note: This is only exposed externally for the tests. Do not call this from within
+     * the app.
      * @param trigger Set to false to prevent a list update from being sent. Should only
      * be used if the calling code will manually trigger the update.
      */
-    private async regenerateAllLists({trigger = true}) {
+    public async regenerateAllLists({trigger = true}) {
         console.warn("Regenerating all room lists");
 
         const sorts: ITagSortingMap = {};
