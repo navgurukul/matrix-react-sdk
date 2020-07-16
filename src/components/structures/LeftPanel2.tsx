@@ -35,16 +35,7 @@ import RoomListStore, { LISTS_UPDATE_EVENT } from "../../stores/room-list/RoomLi
 import {Key} from "../../Keyboard";
 import IndicatorScrollbar from "../structures/IndicatorScrollbar";
 
-// TODO: Remove banner on launch: https://github.com/vector-im/riot-web/issues/14367
 // TODO: Rename on launch: https://github.com/vector-im/riot-web/issues/14367
-
-/*******************************************************************
- *   CAUTION                                                       *
- *******************************************************************
- * This is a work in progress implementation and isn't complete or *
- * even useful as a component. Please avoid using it until this    *
- * warning disappears.                                             *
- *******************************************************************/
 
 interface IProps {
     isMinimized: boolean;
@@ -111,6 +102,10 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
         const newVal = BreadcrumbsStore.instance.visible;
         if (newVal !== this.state.showBreadcrumbs) {
             this.setState({showBreadcrumbs: newVal});
+
+            // Update the sticky headers too as the breadcrumbs will be popping in or out.
+            if (!this.listContainerRef.current) return; // ignore: no headers to sticky
+            this.handleStickyHeaders(this.listContainerRef.current);
         }
     };
 
@@ -170,7 +165,6 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
         // layout updates.
         for (const header of targetStyles.keys()) {
             const style = targetStyles.get(header);
-            const headerContainer = header.parentElement; // .mx_RoomSublist2_headerContainer
 
             if (style.makeInvisible) {
                 // we will have already removed the 'display: none', so add it back.
@@ -187,18 +181,28 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
                 if (header.style.top !== newTop) {
                     header.style.top = newTop;
                 }
-            } else if (style.stickyBottom) {
+            } else {
+                if (header.classList.contains("mx_RoomSublist2_headerContainer_stickyTop")) {
+                    header.classList.remove("mx_RoomSublist2_headerContainer_stickyTop");
+                }
+                if (header.style.top) {
+                    header.style.removeProperty('top');
+                }
+            }
+
+            if (style.stickyBottom) {
                 if (!header.classList.contains("mx_RoomSublist2_headerContainer_stickyBottom")) {
                     header.classList.add("mx_RoomSublist2_headerContainer_stickyBottom");
+                }
+            } else {
+                if (header.classList.contains("mx_RoomSublist2_headerContainer_stickyBottom")) {
+                    header.classList.remove("mx_RoomSublist2_headerContainer_stickyBottom");
                 }
             }
 
             if (style.stickyTop || style.stickyBottom) {
                 if (!header.classList.contains("mx_RoomSublist2_headerContainer_sticky")) {
                     header.classList.add("mx_RoomSublist2_headerContainer_sticky");
-                }
-                if (!headerContainer.classList.contains("mx_RoomSublist2_headerContainer_hasSticky")) {
-                    headerContainer.classList.add("mx_RoomSublist2_headerContainer_hasSticky");
                 }
 
                 const newWidth = `${headerStickyWidth}px`;
@@ -209,20 +213,8 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
                 if (header.classList.contains("mx_RoomSublist2_headerContainer_sticky")) {
                     header.classList.remove("mx_RoomSublist2_headerContainer_sticky");
                 }
-                if (header.classList.contains("mx_RoomSublist2_headerContainer_stickyTop")) {
-                    header.classList.remove("mx_RoomSublist2_headerContainer_stickyTop");
-                }
-                if (header.classList.contains("mx_RoomSublist2_headerContainer_stickyBottom")) {
-                    header.classList.remove("mx_RoomSublist2_headerContainer_stickyBottom");
-                }
-                if (headerContainer.classList.contains("mx_RoomSublist2_headerContainer_hasSticky")) {
-                    headerContainer.classList.remove("mx_RoomSublist2_headerContainer_hasSticky");
-                }
                 if (header.style.width) {
                     header.style.removeProperty('width');
-                }
-                if (header.style.top) {
-                    header.style.removeProperty('top');
                 }
             }
         }
@@ -242,7 +234,6 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
         }
     }
 
-    // TODO: Improve header reliability: https://github.com/vector-im/riot-web/issues/14232
     private onScroll = (ev: React.MouseEvent<HTMLDivElement>) => {
         const list = ev.target as HTMLDivElement;
         this.handleStickyHeaders(list);
@@ -278,7 +269,7 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
         const firstRoom = this.listContainerRef.current.querySelector<HTMLDivElement>(".mx_RoomTile2");
         if (firstRoom) {
             firstRoom.click();
-            this.onSearch(""); // clear the search field
+            return true; // to get the field to clear
         }
     };
 
@@ -322,24 +313,24 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
     };
 
     private renderHeader(): React.ReactNode {
-        let breadcrumbs;
+        return (
+            <div className="mx_LeftPanel2_userHeader">
+                <UserMenu isMinimized={this.props.isMinimized} />
+            </div>
+        );
+    }
+
+    private renderBreadcrumbs(): React.ReactNode {
         if (this.state.showBreadcrumbs && !this.props.isMinimized) {
-            breadcrumbs = (
+            return (
                 <IndicatorScrollbar
-                    className="mx_LeftPanel2_headerRow mx_LeftPanel2_breadcrumbsContainer mx_AutoHideScrollbar"
+                    className="mx_LeftPanel2_breadcrumbsContainer mx_AutoHideScrollbar"
                     verticalScrollsHorizontally={true}
                 >
                     <RoomBreadcrumbs2 />
                 </IndicatorScrollbar>
             );
         }
-
-        return (
-            <div className="mx_LeftPanel2_userHeader">
-                <UserMenu isMinimized={this.props.isMinimized} />
-                {breadcrumbs}
-            </div>
-        );
     }
 
     private renderSearchExplore(): React.ReactNode {
@@ -383,8 +374,6 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
             onResize={this.onResize}
         />;
 
-        // TODO: Conference handling / calls: https://github.com/vector-im/riot-web/issues/14177
-
         const containerClasses = classNames({
             "mx_LeftPanel2": true,
             "mx_LeftPanel2_hasTagPanel": !!tagPanel,
@@ -402,6 +391,7 @@ export default class LeftPanel2 extends React.Component<IProps, IState> {
                 <aside className="mx_LeftPanel2_roomListContainer">
                     {this.renderHeader()}
                     {this.renderSearchExplore()}
+                    {this.renderBreadcrumbs()}
                     <div className="mx_LeftPanel2_roomListWrapper">
                         <div
                             className={roomListClasses}

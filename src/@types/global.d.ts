@@ -19,6 +19,7 @@ import ContentMessages from "../ContentMessages";
 import { IMatrixClientPeg } from "../MatrixClientPeg";
 import ToastStore from "../stores/ToastStore";
 import DeviceListener from "../DeviceListener";
+import RebrandListener from "../RebrandListener";
 import { RoomListStore2 } from "../stores/room-list/RoomListStore2";
 import { PlatformPeg } from "../PlatformPeg";
 import RoomListLayoutStore from "../stores/room-list/RoomListLayoutStore";
@@ -34,12 +35,13 @@ declare global {
         mx_ContentMessages: ContentMessages;
         mx_ToastStore: ToastStore;
         mx_DeviceListener: DeviceListener;
+        mx_RebrandListener: RebrandListener;
         mx_RoomListStore2: RoomListStore2;
         mx_RoomListLayoutStore: RoomListLayoutStore;
         mxPlatformPeg: PlatformPeg;
 
         // TODO: Remove flag before launch: https://github.com/vector-im/riot-web/issues/14231
-        mx_QuietRoomListLogging: boolean;
+        mx_LoudRoomListLogging: boolean;
     }
 
     // workaround for https://github.com/microsoft/TypeScript/issues/30933
