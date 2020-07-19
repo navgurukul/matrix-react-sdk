@@ -154,6 +154,12 @@ export const SETTINGS = {
         supportedLevels: LEVELS_FEATURE,
         default: false,
     },
+    "advancedRoomListLogging": {
+        // TODO: Remove flag before launch: https://github.com/vector-im/riot-web/issues/14231
+        displayName: _td("Enable advanced debugging for the room list"),
+        supportedLevels: LEVELS_DEVICE_ONLY_SETTINGS,
+        default: false,
+    },
     "mjolnirRooms": {
         supportedLevels: ['account'],
         default: [],
@@ -351,6 +357,12 @@ export const SETTINGS = {
         default: "en",
     },
     "breadcrumb_rooms": {
+        // not really a setting
+        supportedLevels: ['account'],
+        default: [],
+    },
+    "recent_emoji": {
+        // not really a setting
         supportedLevels: ['account'],
         default: [],
     },
