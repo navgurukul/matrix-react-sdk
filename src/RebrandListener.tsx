@@ -127,6 +127,7 @@ export default class RebrandListener {
         // log in again) and a nag toast where they need to log in to the app on a different domain.
         let nagToast = false;
         let oneTimeToast = false;
+	return;
 
         if (getRedirectUrl(window.location)) {
             if (!this.nagAgainAt) {
