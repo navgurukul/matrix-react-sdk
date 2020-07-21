@@ -1893,7 +1893,7 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
 
         const cli = MatrixClientPeg.get();
         const cryptoEnabled = cli.isCryptoEnabled();
-        if (!cryptoEnabled) {
+        if (true) { // (!cryptoEnabled) {
             this.onLoggedIn();
         }
 
