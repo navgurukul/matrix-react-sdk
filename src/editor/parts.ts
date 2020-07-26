@@ -22,7 +22,7 @@ import {Room} from "matrix-js-sdk/src/models/room";
 import AutocompleteWrapperModel, {
     GetAutocompleterComponent,
     UpdateCallback,
-    UpdateQuery
+    UpdateQuery,
 } from "./autocomplete";
 import * as Avatar from "../Avatar";
 
@@ -186,7 +186,11 @@ abstract class PlainBasePart extends BasePart {
         }
         // when not pasting or dropping text, reject characters that should start a pill candidate
         if (inputType !== "insertFromPaste" && inputType !== "insertFromDrop") {
-            return chr !== "@" && chr !== "#" && chr !== ":";
+            if (chr !== "@" && chr !== "#" && chr !== ":" && chr !== "+") {
+                return true;
+            }
+            // only split if the previous character is a space
+            return this._text[offset - 1] !== " ";
         }
         return true;
     }
@@ -463,6 +467,7 @@ export class PartCreator {
             case "#":
             case "@":
             case ":":
+            case "+":
                 return this.pillCandidate("");
             case "\n":
                 return new NewlinePart();

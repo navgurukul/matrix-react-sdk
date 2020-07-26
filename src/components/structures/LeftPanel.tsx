@@ -17,6 +17,7 @@ limitations under the License.
 import * as React from "react";
 import { createRef } from "react";
 import TagPanel from "./TagPanel";
+import CustomRoomTagPanel from "./CustomRoomTagPanel";
 import classNames from "classnames";
 import dis from "../../dispatcher/dispatcher";
 import { _t } from "../../languageHandler";
@@ -34,6 +35,8 @@ import RoomListStore, { LISTS_UPDATE_EVENT } from "../../stores/room-list/RoomLi
 import {Key} from "../../Keyboard";
 import IndicatorScrollbar from "../structures/IndicatorScrollbar";
 import AccessibleTooltipButton from "../views/elements/AccessibleTooltipButton";
+import { OwnProfileStore } from "../../stores/OwnProfileStore";
+import { MatrixClientPeg } from "../../MatrixClientPeg";
 
 interface IProps {
     isMinimized: boolean;
@@ -58,6 +61,7 @@ const cssClasses = [
 export default class LeftPanel extends React.Component<IProps, IState> {
     private listContainerRef: React.RefObject<HTMLDivElement> = createRef();
     private tagPanelWatcherRef: string;
+    private bgImageWatcherRef: string;
     private focusedElement = null;
     private isDoingStickyHeaders = false;
 
@@ -72,6 +76,9 @@ export default class LeftPanel extends React.Component<IProps, IState> {
 
         BreadcrumbsStore.instance.on(UPDATE_EVENT, this.onBreadcrumbsUpdate);
         RoomListStore.instance.on(LISTS_UPDATE_EVENT, this.onBreadcrumbsUpdate);
+        OwnProfileStore.instance.on(UPDATE_EVENT, this.onBackgroundImageUpdate);
+        this.bgImageWatcherRef = SettingsStore.watchSetting(
+            "RoomList.backgroundImage", null, this.onBackgroundImageUpdate);
         this.tagPanelWatcherRef = SettingsStore.watchSetting("TagPanel.enableTagPanel", null, () => {
             this.setState({showTagPanel: SettingsStore.getValue("TagPanel.enableTagPanel")});
         });
@@ -83,8 +90,10 @@ export default class LeftPanel extends React.Component<IProps, IState> {
 
     public componentWillUnmount() {
         SettingsStore.unwatchSetting(this.tagPanelWatcherRef);
+        SettingsStore.unwatchSetting(this.bgImageWatcherRef);
         BreadcrumbsStore.instance.off(UPDATE_EVENT, this.onBreadcrumbsUpdate);
         RoomListStore.instance.off(LISTS_UPDATE_EVENT, this.onBreadcrumbsUpdate);
+        OwnProfileStore.instance.off(UPDATE_EVENT, this.onBackgroundImageUpdate);
         this.props.resizeNotifier.off("middlePanelResizedNoisy", this.onResize);
     }
 
@@ -104,6 +113,20 @@ export default class LeftPanel extends React.Component<IProps, IState> {
             // Update the sticky headers too as the breadcrumbs will be popping in or out.
             if (!this.listContainerRef.current) return; // ignore: no headers to sticky
             this.handleStickyHeaders(this.listContainerRef.current);
+        }
+    };
+
+    private onBackgroundImageUpdate = () => {
+        // Note: we do this in the LeftPanel as it uses this variable most prominently.
+        const avatarSize = 32; // arbitrary
+        let avatarUrl = OwnProfileStore.instance.getHttpAvatarUrl(avatarSize);
+        const settingBgMxc = SettingsStore.getValue("RoomList.backgroundImage");
+        if (settingBgMxc) {
+            avatarUrl = MatrixClientPeg.get().mxcUrlToHttp(settingBgMxc, avatarSize, avatarSize);
+        }
+        const avatarUrlProp = `url(${avatarUrl})`;
+        if (document.body.style.getPropertyValue("--avatar-url") !== avatarUrlProp) {
+            document.body.style.setProperty("--avatar-url", avatarUrlProp);
         }
     };
 
@@ -361,6 +384,7 @@ export default class LeftPanel extends React.Component<IProps, IState> {
         const tagPanel = !this.state.showTagPanel ? null : (
             <div className="mx_LeftPanel_tagPanelContainer">
                 <TagPanel/>
+                {SettingsStore.isFeatureEnabled("feature_custom_tags") ? <CustomRoomTagPanel /> : null}
             </div>
         );
 
