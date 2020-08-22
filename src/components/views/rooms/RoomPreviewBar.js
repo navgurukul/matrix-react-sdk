@@ -288,7 +288,6 @@ export default createReactClass({
         const AccessibleButton = sdk.getComponent('elements.AccessibleButton');
 
         let showSpinner = false;
-        let darkStyle = false;
         let title;
         let subTitle;
         let primaryActionHandler;
@@ -316,7 +315,6 @@ export default createReactClass({
                 break;
             }
             case MessageCase.NotLoggedIn: {
-                darkStyle = true;
                 title = _t("Join the conversation with an account");
                 primaryActionLabel = _t("Sign Up");
                 primaryActionHandler = this.onRegisterClick;
@@ -513,7 +511,7 @@ export default createReactClass({
                         "If you think you're seeing this message in error, please " +
                         "<issueLink>submit a bug report</issueLink>.",
                         { errcode: this.props.error.errcode },
-                        { issueLink: label => <a href="https://github.com/vector-im/riot-web/issues/new/choose"
+                        { issueLink: label => <a href="https://github.com/vector-im/element-web/issues/new/choose"
                             target="_blank" rel="noreferrer noopener">{ label }</a> },
                     ),
                 ];
@@ -557,7 +555,6 @@ export default createReactClass({
         const classes = classNames("mx_RoomPreviewBar", "dark-panel", `mx_RoomPreviewBar_${messageCase}`, {
             "mx_RoomPreviewBar_panel": this.props.canPreview,
             "mx_RoomPreviewBar_dialog": !this.props.canPreview,
-            "mx_RoomPreviewBar_dark": darkStyle,
         });
 
         return (

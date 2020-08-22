@@ -21,10 +21,10 @@ import SdkConfig from "../../../../../SdkConfig";
 import CallMediaHandler from "../../../../../CallMediaHandler";
 import Field from "../../../elements/Field";
 import AccessibleButton from "../../../elements/AccessibleButton";
-import {SettingLevel} from "../../../../../settings/SettingsStore";
 import {MatrixClientPeg} from "../../../../../MatrixClientPeg";
 import * as sdk from "../../../../../index";
 import Modal from "../../../../../Modal";
+import {SettingLevel} from "../../../../../settings/SettingLevel";
 
 export default class VoiceUserSettingsTab extends React.Component {
     constructor() {
@@ -157,6 +157,9 @@ export default class VoiceUserSettingsTab extends React.Component {
                 label: _t('Default Device'),
             };
             const getDefaultDevice = (devices) => {
+                // Note we're looking for a device with deviceId 'default' but adding a device
+                // with deviceId == the empty string: this is because Chrome gives us a device
+                // with deviceId 'default', so we're looking for this, not the one we are adding.
                 if (!devices.some((i) => i.deviceId === 'default')) {
                     devices.unshift(defaultOption);
                     return '';

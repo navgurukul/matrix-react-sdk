@@ -136,6 +136,9 @@ export class ImportanceAlgorithm extends OrderingAlgorithm {
         } else {
             throw new Error(`Unhandled splice: ${cause}`);
         }
+
+        // changes have been made if we made it here, so say so
+        return true;
     }
 
     public async handleRoomUpdate(room: Room, cause: RoomUpdateCause): Promise<boolean> {
@@ -267,7 +270,7 @@ export class ImportanceAlgorithm extends OrderingAlgorithm {
                     `!! Room list index corruption: ${lastCat} (i:${indices[lastCat]}) is greater ` +
                     `than ${thisCat} (i:${indices[thisCat]}) - category indices are likely desynced from reality`);
 
-                // TODO: Regenerate index when this happens: https://github.com/vector-im/riot-web/issues/14234
+                // TODO: Regenerate index when this happens: https://github.com/vector-im/element-web/issues/14234
             }
         }
     }

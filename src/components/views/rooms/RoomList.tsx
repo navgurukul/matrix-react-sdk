@@ -31,7 +31,6 @@ import dis from "../../../dispatcher/dispatcher";
 import defaultDispatcher from "../../../dispatcher/dispatcher";
 import RoomSublist from "./RoomSublist";
 import { ActionPayload } from "../../../dispatcher/payloads";
-import { NameFilterCondition } from "../../../stores/room-list/filters/NameFilterCondition";
 import { MatrixClientPeg } from "../../../MatrixClientPeg";
 import GroupAvatar from "../avatars/GroupAvatar";
 import TemporaryTile from "./TemporaryTile";
@@ -43,7 +42,9 @@ import { RoomNotificationStateStore } from "../../../stores/notifications/RoomNo
 import SettingsStore from "../../../settings/SettingsStore";
 import CustomRoomTagStore from "../../../stores/CustomRoomTagStore";
 import { arrayFastClone, arrayHasDiff } from "../../../utils/arrays";
-import { objectShallowClone } from "../../../utils/objects";
+import { objectShallowClone, objectWithOnly } from "../../../utils/objects";
+import { IconizedContextMenuOption, IconizedContextMenuOptionList } from "../context_menus/IconizedContextMenu";
+import AccessibleButton from "../elements/AccessibleButton";
 
 interface IProps {
     onKeyDown: (ev: React.KeyboardEvent) => void;
@@ -52,7 +53,6 @@ interface IProps {
     onResize: () => void;
     resizeNotifier: ResizeNotifier;
     collapsed: boolean;
-    searchFilter: string;
     isMinimized: boolean;
 }
 
@@ -83,6 +83,7 @@ interface ITagAesthetics {
     sectionLabelRaw?: string;
     addRoomLabel?: string;
     onAddRoom?: (dispatcher?: Dispatcher<ActionPayload>) => void;
+    addRoomContextMenu?: (onFinished: () => void) => React.ReactNode;
     isInvite: boolean;
     defaultHidden: boolean;
 }
@@ -114,9 +115,30 @@ const TAG_AESTHETICS: {
         sectionLabel: _td("Rooms"),
         isInvite: false,
         defaultHidden: false,
-        addRoomLabel: _td("Create room"),
-        onAddRoom: (dispatcher?: Dispatcher<ActionPayload>) => {
-            (dispatcher || defaultDispatcher).dispatch({action: 'view_create_room'})
+        addRoomLabel: _td("Add room"),
+        addRoomContextMenu: (onFinished: () => void) => {
+            return <IconizedContextMenuOptionList first>
+                <IconizedContextMenuOption
+                    label={_t("Create new room")}
+                    iconClassName="mx_RoomList_iconPlus"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onFinished();
+                        defaultDispatcher.dispatch({action: "view_create_room"});
+                    }}
+                />
+                <IconizedContextMenuOption
+                    label={_t("Explore public rooms")}
+                    iconClassName="mx_RoomList_iconExplore"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onFinished();
+                        defaultDispatcher.fire(Action.ViewRoomDirectory);
+                    }}
+                />
+            </IconizedContextMenuOptionList>;
         },
     },
     [DefaultTagID.LowPriority]: {
@@ -130,7 +152,7 @@ const TAG_AESTHETICS: {
         defaultHidden: false,
     },
 
-    // TODO: Replace with archived view: https://github.com/vector-im/riot-web/issues/14038
+    // TODO: Replace with archived view: https://github.com/vector-im/element-web/issues/14038
     [DefaultTagID.Archived]: {
         sectionLabel: _td("Historical"),
         isInvite: false,
@@ -150,8 +172,7 @@ function customTagAesthetics(tagId: TagID): ITagAesthetics {
     };
 }
 
-export default class RoomList extends React.Component<IProps, IState> {
-    private searchFilter: NameFilterCondition = new NameFilterCondition();
+export default class RoomList extends React.PureComponent<IProps, IState> {
     private dispatcherRef;
     private customTagStoreRef;
 
@@ -163,21 +184,6 @@ export default class RoomList extends React.Component<IProps, IState> {
         };
 
         this.dispatcherRef = defaultDispatcher.register(this.onAction);
-    }
-
-    public componentDidUpdate(prevProps: Readonly<IProps>): void {
-        if (prevProps.searchFilter !== this.props.searchFilter) {
-            const hadSearch = !!this.searchFilter.search.trim();
-            const haveSearch = !!this.props.searchFilter.trim();
-            this.searchFilter.search = this.props.searchFilter;
-            if (!hadSearch && haveSearch) {
-                // started a new filter - add the condition
-                RoomListStore.instance.addFilter(this.searchFilter);
-            } else if (hadSearch && !haveSearch) {
-                // cleared a filter - remove the condition
-                RoomListStore.instance.removeFilter(this.searchFilter);
-            } // else the filter hasn't changed enough for us to care here
-        }
     }
 
     public componentDidMount(): void {
@@ -233,12 +239,17 @@ export default class RoomList extends React.Component<IProps, IState> {
     private updateLists = () => {
         const newLists = RoomListStore.instance.orderedLists;
         if (SettingsStore.getValue("advancedRoomListLogging")) {
-            // TODO: Remove debug: https://github.com/vector-im/riot-web/issues/14602
+            // TODO: Remove debug: https://github.com/vector-im/element-web/issues/14602
             console.log("new lists", newLists);
         }
 
         const previousListIds = Object.keys(this.state.sublists);
-        const newListIds = Object.keys(newLists);
+        const newListIds = Object.keys(newLists).filter(t => {
+            if (!isCustomTag(t)) return true; // always include non-custom tags
+
+            // if the tag is custom though, only include it if it is enabled
+            return CustomRoomTagStore.getTags()[t];
+        });
 
         let doUpdate = arrayHasDiff(previousListIds, newListIds);
         if (!doUpdate) {
@@ -258,7 +269,9 @@ export default class RoomList extends React.Component<IProps, IState> {
         if (doUpdate) {
             // We have to break our reference to the room list store if we want to be able to
             // diff the object for changes, so do that.
-            const sublists = objectShallowClone(newLists, (k, v) => arrayFastClone(v));
+            // @ts-ignore - ITagMap is ts-ignored so this will have to be too
+            const newSublists = objectWithOnly(newLists, newListIds);
+            const sublists = objectShallowClone(newSublists, (k, v) => arrayFastClone(v));
 
             this.setState({sublists}, () => {
                 this.props.onResize();
@@ -266,12 +279,15 @@ export default class RoomList extends React.Component<IProps, IState> {
         }
     };
 
-    private renderCommunityInvites(): React.ReactElement[] {
+    private onExplore = () => {
+        dis.fire(Action.ViewRoomDirectory);
+    };
+
+    private renderCommunityInvites(): TemporaryTile[] {
         // TODO: Put community invites in a more sensible place (not in the room list)
-        // See https://github.com/vector-im/riot-web/issues/14456
+        // See https://github.com/vector-im/element-web/issues/14456
         return MatrixClientPeg.get().getGroups().filter(g => {
-           if (g.myMembership !== 'invite') return false;
-           return !this.searchFilter || this.searchFilter.matches(g.name || "");
+           return g.myMembership === 'invite';
         }).map(g => {
             const avatar = (
                 <GroupAvatar
@@ -307,8 +323,7 @@ export default class RoomList extends React.Component<IProps, IState> {
         const tagOrder = TAG_ORDER.reduce((p, c) => {
             if (c === CUSTOM_TAGS_BEFORE_TAG) {
                 const customTags = Object.keys(this.state.sublists)
-                    .filter(t => isCustomTag(t))
-                    .filter(t => CustomRoomTagStore.getTags()[t]); // isSelected
+                    .filter(t => isCustomTag(t));
                 p.push(...customTags);
             }
             p.push(c);
@@ -337,10 +352,10 @@ export default class RoomList extends React.Component<IProps, IState> {
                     label={aesthetics.sectionLabelRaw ? aesthetics.sectionLabelRaw : _t(aesthetics.sectionLabel)}
                     onAddRoom={aesthetics.onAddRoom}
                     addRoomLabel={aesthetics.addRoomLabel ? _t(aesthetics.addRoomLabel) : aesthetics.addRoomLabel}
+                    addRoomContextMenu={aesthetics.addRoomContextMenu}
                     isMinimized={this.props.isMinimized}
                     onResize={this.props.onResize}
                     extraBadTilesThatShouldntExist={extraTiles}
-                    isFiltered={!!this.searchFilter.search}
                 />
             );
         }
@@ -349,6 +364,16 @@ export default class RoomList extends React.Component<IProps, IState> {
     }
 
     public render() {
+        let explorePrompt: JSX.Element;
+        if (RoomListStore.instance.getFirstNameFilterCondition()) {
+            explorePrompt = <div className="mx_RoomList_explorePrompt">
+                <div>{_t("Can't see what you’re looking for?")}</div>
+                <AccessibleButton kind="link" onClick={this.onExplore}>
+                    {_t("Explore all public rooms")}
+                </AccessibleButton>
+            </div>;
+        }
+
         const sublists = this.renderSublists();
         return (
             <RovingTabIndexProvider handleHomeEnd={true} onKeyDown={this.props.onKeyDown}>
@@ -360,7 +385,10 @@ export default class RoomList extends React.Component<IProps, IState> {
                         className="mx_RoomList"
                         role="tree"
                         aria-label={_t("Rooms")}
-                    >{sublists}</div>
+                    >
+                        {sublists}
+                        {explorePrompt}
+                    </div>
                 )}
             </RovingTabIndexProvider>
         );

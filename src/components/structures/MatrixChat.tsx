@@ -51,7 +51,7 @@ import { getHomePageUrl } from '../../utils/pages';
 
 import createRoom from "../../createRoom";
 import {_t, _td, getCurrentLanguage} from '../../languageHandler';
-import SettingsStore, { SettingLevel } from "../../settings/SettingsStore";
+import SettingsStore from "../../settings/SettingsStore";
 import ThemeController from "../../settings/controllers/ThemeController";
 import { startAnyRegistrationFlow } from "../../Registration.js";
 import { messageForSyncError } from '../../utils/ErrorUtils';
@@ -75,6 +75,8 @@ import {showToast as showNotificationsToast} from "../../toasts/DesktopNotificat
 import { OpenToTabPayload } from "../../dispatcher/payloads/OpenToTabPayload";
 import ErrorDialog from "../views/dialogs/ErrorDialog";
 import { RoomNotificationStateStore } from "../../stores/notifications/RoomNotificationStateStore";
+import { SettingLevel } from "../../settings/SettingLevel";
+import { leaveRoomBehaviour } from "../../utils/membership";
 
 /** constants for MatrixChat.state.view */
 export enum Views {
@@ -414,7 +416,7 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
             return;
         }
         this.pageChanging = true;
-        performance.mark('riot_MatrixChat_page_change_start');
+        performance.mark('element_MatrixChat_page_change_start');
     }
 
     stopPageChangeTimer() {
@@ -426,15 +428,15 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
             return;
         }
         this.pageChanging = false;
-        performance.mark('riot_MatrixChat_page_change_stop');
+        performance.mark('element_MatrixChat_page_change_stop');
         performance.measure(
-            'riot_MatrixChat_page_change_delta',
-            'riot_MatrixChat_page_change_start',
-            'riot_MatrixChat_page_change_stop',
+            'element_MatrixChat_page_change_delta',
+            'element_MatrixChat_page_change_start',
+            'element_MatrixChat_page_change_stop',
         );
-        performance.clearMarks('riot_MatrixChat_page_change_start');
-        performance.clearMarks('riot_MatrixChat_page_change_stop');
-        const measurement = performance.getEntriesByName('riot_MatrixChat_page_change_delta').pop();
+        performance.clearMarks('element_MatrixChat_page_change_start');
+        performance.clearMarks('element_MatrixChat_page_change_stop');
+        const measurement = performance.getEntriesByName('element_MatrixChat_page_change_delta').pop();
 
         // In practice, sometimes the entries list is empty, so we get no measurement
         if (!measurement) return null;
@@ -1081,50 +1083,13 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
             button: _t("Leave"),
             onFinished: (shouldLeave) => {
                 if (shouldLeave) {
-                    const d = MatrixClientPeg.get().leaveRoomChain(roomId);
+                    const d = leaveRoomBehaviour(roomId);
 
                     // FIXME: controller shouldn't be loading a view :(
                     const Loader = sdk.getComponent("elements.Spinner");
                     const modal = Modal.createDialog(Loader, null, 'mx_Dialog_spinner');
 
-                    d.then((errors) => {
-                        modal.close();
-
-                        for (const leftRoomId of Object.keys(errors)) {
-                            const err = errors[leftRoomId];
-                            if (!err) continue;
-
-                            console.error("Failed to leave room " + leftRoomId + " " + err);
-                            let title = _t("Failed to leave room");
-                            let message = _t("Server may be unavailable, overloaded, or you hit a bug.");
-                            if (err.errcode === 'M_CANNOT_LEAVE_SERVER_NOTICE_ROOM') {
-                                title = _t("Can't leave Server Notices room");
-                                message = _t(
-                                    "This room is used for important messages from the Homeserver, " +
-                                    "so you cannot leave it.",
-                                );
-                            } else if (err && err.message) {
-                                message = err.message;
-                            }
-                            Modal.createTrackedDialog('Failed to leave room', '', ErrorDialog, {
-                                title: title,
-                                description: message,
-                            });
-                            return;
-                        }
-
-                        if (this.state.currentRoomId === roomId) {
-                            dis.dispatch({action: 'view_next_room'});
-                        }
-                    }, (err) => {
-                        // This should only happen if something went seriously wrong with leaving the chain.
-                        modal.close();
-                        console.error("Failed to leave room " + roomId + " " + err);
-                        Modal.createTrackedDialog('Failed to leave room', '', ErrorDialog, {
-                            title: _t("Failed to leave room"),
-                            description: _t("Unknown error"),
-                        });
-                    });
+                    d.finally(() => modal.close());
                 }
             },
         });
@@ -1322,7 +1287,7 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
         // state (each of which can be 10s of MBs) for each DISJOINT timeline. This is
         // particularly noticeable when there are lots of 'limited' /sync responses
         // such as when laptops unsleep.
-        // https://github.com/vector-im/riot-web/issues/3307#issuecomment-282895568
+        // https://github.com/vector-im/element-web/issues/3307#issuecomment-282895568
         cli.setCanResetTimelineCallback((roomId) => {
             console.log("Request to reset timeline in room ", roomId, " viewing:", this.state.currentRoomId);
             if (roomId !== this.state.currentRoomId) {
@@ -1660,7 +1625,7 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
             // of the app, we coerce the eventId to be undefined where applicable.
             if (!eventId) eventId = undefined;
 
-            // TODO: Handle encoded room/event IDs: https://github.com/vector-im/riot-web/issues/9149
+            // TODO: Handle encoded room/event IDs: https://github.com/vector-im/element-web/issues/9149
 
             // FIXME: sort_out caseConsistency
             const thirdPartyInvite = {
@@ -1934,7 +1899,7 @@ export default class MatrixChat extends React.PureComponent<IProps, IState> {
         let fragmentAfterLogin = "";
         const initialScreenAfterLogin = this.props.initialScreenAfterLogin;
         if (initialScreenAfterLogin &&
-            // XXX: workaround for https://github.com/vector-im/riot-web/issues/11643 causing a login-loop
+            // XXX: workaround for https://github.com/vector-im/element-web/issues/11643 causing a login-loop
             !["welcome", "login", "register", "start_sso", "start_cas"].includes(initialScreenAfterLogin.screen)
         ) {
             fragmentAfterLogin = `/${initialScreenAfterLogin.screen}`;

@@ -22,6 +22,7 @@ import SettingsStore from "../settings/SettingsStore";
 import RoomListStore, {LISTS_UPDATE_EVENT} from "./room-list/RoomListStore";
 import {RoomNotificationStateStore} from "./notifications/RoomNotificationStateStore";
 import {isCustomTag} from "./room-list/models";
+import {objectHasDiff} from "../utils/objects";
 
 function commonPrefix(a, b) {
     const len = Math.min(a.length, b.length);
@@ -107,7 +108,10 @@ class CustomRoomTagStore extends EventEmitter {
     }
 
     _onListsUpdated = () => {
-        this._setState({tags: this._getUpdatedTags()});
+        const newTags = this._getUpdatedTags();
+        if (!this._state.tags || objectHasDiff(this._state.tags, newTags)) {
+            this._setState({tags: newTags});
+        }
     };
 
     _onDispatch(payload) {
@@ -133,8 +137,8 @@ class CustomRoomTagStore extends EventEmitter {
     }
 
     _getUpdatedTags() {
-        if (!SettingsStore.isFeatureEnabled("feature_custom_tags")) {
-            return;
+        if (!SettingsStore.getValue("feature_custom_tags")) {
+            return {}; // none
         }
 
         const newTagNames = Object.keys(RoomListStore.instance.orderedLists).filter(t => isCustomTag(t)).sort();

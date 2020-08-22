@@ -37,6 +37,7 @@ import IndicatorScrollbar from "../structures/IndicatorScrollbar";
 import AccessibleTooltipButton from "../views/elements/AccessibleTooltipButton";
 import { OwnProfileStore } from "../../stores/OwnProfileStore";
 import { MatrixClientPeg } from "../../MatrixClientPeg";
+import RoomListNumResults from "../views/rooms/RoomListNumResults";
 
 interface IProps {
     isMinimized: boolean;
@@ -44,7 +45,6 @@ interface IProps {
 }
 
 interface IState {
-    searchFilter: string;
     showBreadcrumbs: boolean;
     showTagPanel: boolean;
 }
@@ -69,7 +69,6 @@ export default class LeftPanel extends React.Component<IProps, IState> {
         super(props);
 
         this.state = {
-            searchFilter: "",
             showBreadcrumbs: BreadcrumbsStore.instance.visible,
             showTagPanel: SettingsStore.getValue('TagPanel.enableTagPanel'),
         };
@@ -96,10 +95,6 @@ export default class LeftPanel extends React.Component<IProps, IState> {
         OwnProfileStore.instance.off(UPDATE_EVENT, this.onBackgroundImageUpdate);
         this.props.resizeNotifier.off("middlePanelResizedNoisy", this.onResize);
     }
-
-    private onSearch = (term: string): void => {
-        this.setState({searchFilter: term});
-    };
 
     private onExplore = () => {
         dis.fire(Action.ViewRoomDirectory);
@@ -366,7 +361,6 @@ export default class LeftPanel extends React.Component<IProps, IState> {
                 onKeyDown={this.onKeyDown}
             >
                 <RoomSearch
-                    onQueryUpdate={this.onSearch}
                     isMinimized={this.props.isMinimized}
                     onVerticalArrow={this.onKeyDown}
                     onEnter={this.onEnter}
@@ -384,7 +378,7 @@ export default class LeftPanel extends React.Component<IProps, IState> {
         const tagPanel = !this.state.showTagPanel ? null : (
             <div className="mx_LeftPanel_tagPanelContainer">
                 <TagPanel/>
-                {SettingsStore.isFeatureEnabled("feature_custom_tags") ? <CustomRoomTagPanel /> : null}
+                {SettingsStore.getValue("feature_custom_tags") ? <CustomRoomTagPanel /> : null}
             </div>
         );
 
@@ -392,7 +386,6 @@ export default class LeftPanel extends React.Component<IProps, IState> {
             onKeyDown={this.onKeyDown}
             resizeNotifier={null}
             collapsed={false}
-            searchFilter={this.state.searchFilter}
             onFocus={this.onFocus}
             onBlur={this.onBlur}
             isMinimized={this.props.isMinimized}
@@ -417,6 +410,7 @@ export default class LeftPanel extends React.Component<IProps, IState> {
                     {this.renderHeader()}
                     {this.renderSearchExplore()}
                     {this.renderBreadcrumbs()}
+                    <RoomListNumResults />
                     <div className="mx_LeftPanel_roomListWrapper">
                         <div
                             className={roomListClasses}
