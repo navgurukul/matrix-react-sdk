@@ -29,6 +29,7 @@ import {sleep} from "../../../../../utils/promise";
 import dis from "../../../../../dispatcher/dispatcher";
 import {privateShouldBeEncrypted} from "../../../../../createRoom";
 import {SettingLevel} from "../../../../../settings/SettingLevel";
+import SecureBackupPanel from "../../SecureBackupPanel";
 
 export class IgnoredUser extends React.Component {
     static propTypes = {
@@ -288,12 +289,11 @@ export default class SecurityUserSettingsTab extends React.Component {
         const SettingsFlag = sdk.getComponent('views.elements.SettingsFlag');
         const EventIndexPanel = sdk.getComponent('views.settings.EventIndexPanel');
 
-        const KeyBackupPanel = sdk.getComponent('views.settings.KeyBackupPanel');
-        const keyBackup = (
+        const secureBackup = (
             <div className='mx_SettingsTab_section'>
-                <span className="mx_SettingsTab_subheading">{_t("Key backup")}</span>
+                <span className="mx_SettingsTab_subheading">{_t("Secure Backup")}</span>
                 <div className='mx_SettingsTab_subsectionText'>
-                    <KeyBackupPanel />
+                    <SecureBackupPanel />
                 </div>
             </div>
         );
@@ -332,9 +332,8 @@ export default class SecurityUserSettingsTab extends React.Component {
         return (
             <div className="mx_SettingsTab mx_SecurityUserSettingsTab">
                 {warning}
-                <div className="mx_SettingsTab_heading">{_t("Security & Privacy")}</div>
+                <div className="mx_SettingsTab_heading">{_t("Where you’re logged in")}</div>
                 <div className="mx_SettingsTab_section">
-                    <span className="mx_SettingsTab_subheading">{_t("Where you’re logged in")}</span>
                     <span>
                         {_t(
                             "Manage the names of and sign out of your sessions below or " +
@@ -351,11 +350,15 @@ export default class SecurityUserSettingsTab extends React.Component {
                         <DevicesPanel />
                     </div>
                 </div>
-                {keyBackup}
-                {eventIndex}
-                {crossSigning}
-                {this._renderCurrentDeviceInfo()}
-                <div className='mx_SettingsTab_section'>
+                <div className="mx_SettingsTab_heading">{_t("Encryption")}</div>
+                <div className="mx_SettingsTab_section">
+                    {secureBackup}
+                    {eventIndex}
+                    {crossSigning}
+                    {this._renderCurrentDeviceInfo()}
+                </div>
+                <div className="mx_SettingsTab_heading">{_t("Privacy")}</div>
+                <div className="mx_SettingsTab_section">
                     <span className="mx_SettingsTab_subheading">{_t("Analytics")}</span>
                     <div className='mx_SettingsTab_subsectionText'>
                         {_t(
@@ -372,9 +375,12 @@ export default class SecurityUserSettingsTab extends React.Component {
                     <SettingsFlag name='analyticsOptIn' level={SettingLevel.DEVICE}
                                   onChange={this._updateAnalytics} />
                 </div>
-                {this._renderIgnoredUsers()}
-                {this._renderManageInvites()}
-                <E2eAdvancedPanel />
+                <div className="mx_SettingsTab_heading">{_t("Advanced")}</div>
+                <div className="mx_SettingsTab_section">
+                    {this._renderIgnoredUsers()}
+                    {this._renderManageInvites()}
+                    <E2eAdvancedPanel />
+                </div>
             </div>
         );
     }
