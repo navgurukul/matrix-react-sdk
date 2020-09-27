@@ -28,6 +28,7 @@ import RateLimitedFunc from '../../../ratelimitedfunc';
 import SettingsStore from "../../../settings/SettingsStore";
 import AutoHideScrollbar from "../../structures/AutoHideScrollbar";
 import CallView from "../voip/CallView";
+import {UIFeature} from "../../../settings/UIFeature";
 
 
 export default class AuxPanel extends React.Component {
@@ -38,14 +39,8 @@ export default class AuxPanel extends React.Component {
         showApps: PropTypes.bool, // Render apps
         hideAppsDrawer: PropTypes.bool, // Do not display apps drawer and content (may still be rendered)
 
-        // Conference Handler implementation
-        conferenceHandler: PropTypes.object,
-
         // set to true to show the file drop target
         draggingFile: PropTypes.bool,
-
-        // set to true to show the 'active conf call' banner
-        displayConfCallNotification: PropTypes.bool,
 
         // maxHeight attribute for the aux panel and the video
         // therein
@@ -160,56 +155,29 @@ export default class AuxPanel extends React.Component {
             );
         }
 
-        let conferenceCallNotification = null;
-        if (this.props.displayConfCallNotification) {
-            let supportedText = '';
-            let joinNode;
-            if (!MatrixClientPeg.get().supportsVoip()) {
-                supportedText = _t(" (unsupported)");
-            } else {
-                joinNode = (<span>
-                    { _t(
-                        "Join as <voiceText>voice</voiceText> or <videoText>video</videoText>.",
-                        {},
-                        {
-                            'voiceText': (sub) => <a onClick={(event)=>{ this.onConferenceNotificationClick(event, 'voice');}} href="#">{ sub }</a>,
-                            'videoText': (sub) => <a onClick={(event)=>{ this.onConferenceNotificationClick(event, 'video');}} href="#">{ sub }</a>,
-                        },
-                    ) }
-                </span>);
-            }
-            // XXX: the translation here isn't great: appending ' (unsupported)' is likely to not make sense in many languages,
-            // but there are translations for this in the languages we do have so I'm leaving it for now.
-            conferenceCallNotification = (
-                <div className="mx_RoomView_ongoingConfCallNotification">
-                    { _t("Ongoing conference call%(supportedText)s.", {supportedText: supportedText}) }
-                    &nbsp;
-                    { joinNode }
-                </div>
-            );
-        }
-
         const callView = (
             <CallView
                 room={this.props.room}
-                ConferenceHandler={this.props.conferenceHandler}
                 onResize={this.props.onResize}
                 maxVideoHeight={this.props.maxHeight}
             />
         );
 
-        const appsDrawer = <AppsDrawer
-            room={this.props.room}
-            userId={this.props.userId}
-            maxHeight={this.props.maxHeight}
-            showApps={this.props.showApps}
-            hide={this.props.hideAppsDrawer}
-            resizeNotifier={this.props.resizeNotifier}
-        />;
+        let appsDrawer;
+        if (SettingsStore.getValue(UIFeature.Widgets)) {
+            appsDrawer = <AppsDrawer
+                room={this.props.room}
+                userId={this.props.userId}
+                maxHeight={this.props.maxHeight}
+                showApps={this.props.showApps}
+                hide={this.props.hideAppsDrawer}
+                resizeNotifier={this.props.resizeNotifier}
+            />;
+        }
 
         let stateViews = null;
         if (this.state.counters && SettingsStore.getValue("feature_state_counters")) {
-            let counters = [];
+            const counters = [];
 
             this.state.counters.forEach((counter, idx) => {
                 const title = counter.title;
@@ -218,7 +186,7 @@ export default class AuxPanel extends React.Component {
                 const severity = counter.severity;
                 const stateKey = counter.stateKey;
 
-                let span = <span>{ title }: { value }</span>
+                let span = <span>{ title }: { value }</span>;
 
                 if (link) {
                     span = (
@@ -272,7 +240,6 @@ export default class AuxPanel extends React.Component {
                 { appsDrawer }
                 { fileDropTarget }
                 { callView }
-                { conferenceCallNotification }
                 { this.props.children }
             </AutoHideScrollbar>
         );

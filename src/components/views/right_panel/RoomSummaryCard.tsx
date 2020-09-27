@@ -42,6 +42,7 @@ import AccessibleTooltipButton from "../elements/AccessibleTooltipButton";
 import WidgetStore, {IApp} from "../../../stores/WidgetStore";
 import { E2EStatus } from "../../../utils/ShieldUtils";
 import RoomContext from "../../../contexts/RoomContext";
+import {UIFeature} from "../../../settings/UIFeature";
 
 interface IProps {
     room: Room;
@@ -98,7 +99,7 @@ const AppsSection: React.FC<IAppsSectionProps> = ({ room }) => {
         }
     };
 
-    return <Group className="mx_RoomSummaryCard_appsGroup" title={_t("Apps")}>
+    return <Group className="mx_RoomSummaryCard_appsGroup" title={_t("Widgets")}>
         { apps.map(app => {
             const name = WidgetUtils.getWidgetName(app);
             const dataTitle = WidgetUtils.getWidgetDataTitle(app);
@@ -160,7 +161,7 @@ const AppsSection: React.FC<IAppsSectionProps> = ({ room }) => {
         }) }
 
         <AccessibleButton kind="link" onClick={onManageIntegrations}>
-            { apps.length > 0 ? _t("Edit apps, bridges & bots") : _t("Add apps, bridges & bots") }
+            { apps.length > 0 ? _t("Edit widgets, bridges & bots") : _t("Add widgets, bridges & bots") }
         </AccessibleButton>
     </Group>;
 };
@@ -242,7 +243,7 @@ const RoomSummaryCard: React.FC<IProps> = ({ room, onClose }) => {
             </Button>
         </Group>
 
-        <AppsSection room={room} />
+        { SettingsStore.getValue(UIFeature.Widgets) && <AppsSection room={room} /> }
     </BaseCard>;
 };
 

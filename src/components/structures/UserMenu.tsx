@@ -50,6 +50,7 @@ import dis from "../../dispatcher/dispatcher";
 import { RightPanelPhases } from "../../stores/RightPanelStorePhases";
 import ErrorDialog from "../views/dialogs/ErrorDialog";
 import EditCommunityPrototypeDialog from "../views/dialogs/EditCommunityPrototypeDialog";
+import {UIFeature} from "../../settings/UIFeature";
 
 interface IProps {
     isMinimized: boolean;
@@ -285,6 +286,15 @@ export default class UserMenu extends React.Component<IProps, IState> {
             );
         }
 
+        let feedbackButton;
+        if (SettingsStore.getValue(UIFeature.Feedback)) {
+            feedbackButton = <IconizedContextMenuOption
+                iconClassName="mx_UserMenu_iconMessage"
+                label={_t("Feedback")}
+                onClick={this.onProvideFeedback}
+            />;
+        }
+
         let primaryHeader = (
             <div className="mx_UserMenu_contextMenu_name">
                 <span className="mx_UserMenu_contextMenu_displayName">
@@ -319,11 +329,7 @@ export default class UserMenu extends React.Component<IProps, IState> {
                         label={_t("Archived rooms")}
                         onClick={this.onShowArchived}
                     /> */}
-                    <IconizedContextMenuOption
-                        iconClassName="mx_UserMenu_iconMessage"
-                        label={_t("Feedback")}
-                        onClick={this.onProvideFeedback}
-                    />
+                    { feedbackButton }
                 </IconizedContextMenuOptionList>
                 <IconizedContextMenuOptionList red>
                     <IconizedContextMenuOption
@@ -337,6 +343,7 @@ export default class UserMenu extends React.Component<IProps, IState> {
         let secondarySection = null;
 
         if (prototypeCommunityName) {
+            const communityId = CommunityPrototypeStore.instance.getSelectedCommunityId();
             primaryHeader = (
                 <div className="mx_UserMenu_contextMenu_name">
                     <span className="mx_UserMenu_contextMenu_displayName">
@@ -344,24 +351,36 @@ export default class UserMenu extends React.Component<IProps, IState> {
                     </span>
                 </div>
             );
-            primaryOptionList = (
-                <IconizedContextMenuOptionList>
+            let settingsOption;
+            let inviteOption;
+            if (CommunityPrototypeStore.instance.canInviteTo(communityId)) {
+                inviteOption = (
+                    <IconizedContextMenuOption
+                        iconClassName="mx_UserMenu_iconInvite"
+                        label={_t("Invite")}
+                        onClick={this.onCommunityInviteClick}
+                    />
+                );
+            }
+            if (CommunityPrototypeStore.instance.isAdminOf(communityId)) {
+                settingsOption = (
                     <IconizedContextMenuOption
                         iconClassName="mx_UserMenu_iconSettings"
                         label={_t("Settings")}
                         aria-label={_t("Community settings")}
                         onClick={this.onCommunitySettingsClick}
                     />
+                );
+            }
+            primaryOptionList = (
+                <IconizedContextMenuOptionList>
+                    {settingsOption}
                     <IconizedContextMenuOption
                         iconClassName="mx_UserMenu_iconMembers"
                         label={_t("Members")}
                         onClick={this.onCommunityMembersClick}
                     />
-                    <IconizedContextMenuOption
-                        iconClassName="mx_UserMenu_iconInvite"
-                        label={_t("Invite")}
-                        onClick={this.onCommunityInviteClick}
-                    />
+                    {inviteOption}
                 </IconizedContextMenuOptionList>
             );
             secondarySection = (
@@ -384,11 +403,7 @@ export default class UserMenu extends React.Component<IProps, IState> {
                             aria-label={_t("User settings")}
                             onClick={(e) => this.onSettingsOpen(e, null)}
                         />
-                        <IconizedContextMenuOption
-                            iconClassName="mx_UserMenu_iconMessage"
-                            label={_t("Feedback")}
-                            onClick={this.onProvideFeedback}
-                        />
+                        { feedbackButton }
                     </IconizedContextMenuOptionList>
                     <IconizedContextMenuOptionList red>
                         <IconizedContextMenuOption
